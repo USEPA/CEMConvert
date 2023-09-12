@@ -1,0 +1,133 @@
+#!python
+# Download the annual state CEMS emissions from the CAMD bulk emissions download area
+#  Reformat for input into cemconvert
+
+import time
+import pandas as pd
+import os.path
+from optparse import OptionParser, OptionGroup
+import json
+import io
+import requests
+
+def main():
+    opts, args = get_opts()
+    # YOUR API KEY
+    API_KEY = opts.apikey
+    # Integer value of year YYYY
+    year = int(opts.year)
+    # URL for CAMD API hourly emissions files
+    camd_url = opts.campd_url.strip()
+    #########
+    cems = CEMS()
+    bulkfiles = get_bulk_files({'api_key': API_KEY})
+    states = get_states(opts.states)
+    anndf = pd.DataFrame()
+    for st in states:
+        fn = f'emissions-hourly-{year}-{st}.csv'
+        s3path = bulkfiles.loc[bulkfiles['filename'] == fn, 's3Path'].values[0]
+        url = camd_url + '/' + s3path
+        print(st.upper(), flush=True)
+        df = download_state(url, cems.dtype)
+        anndf = pd.concat((anndf, df))
+        # 2 second timeout between requests
+        time.sleep(2)
+    anndf['mon'] = anndf['Date'].str.split('-').str[1].astype(int)
+    mons = ('jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec')
+    for mon, monname in enumerate(mons):
+        mondf = anndf[anndf['mon'] == mon+1]
+        fn = os.path.join(opts.output_path.strip(),
+          '%s.txt' %'-'.join((opts.prefix.strip(), str(year), monname, 'hourly')))
+        print('Writing %s records to %s' %(len(mondf), fn))
+        mondf.to_csv(fn, index=False, columns=cems.cols)
+
+def get_bulk_files(params):
+    '''
+    Get a list of bulk files available on the server
+    '''
+    res = requests.get("https://api.epa.gov/easey/camd-services/bulk-files", params=params)
+    resjson = res.content.decode('utf8').replace("'", '"')
+    data = json.loads(resjson)
+    s = json.dumps(data, indent=4)
+    jsonread = pd.read_json(s)
+    df = pd.DataFrame(jsonread)
+    return df
+
+def download_state(url, dtype):
+    '''
+    Run the request to try to download the annual state file
+    '''
+    req = requests.get(url)
+    if req.status_code == 200:
+        df = pd.read_csv(io.StringIO(req.content.decode('utf-8')), dtype=dtype)
+    else:
+        raise ValueError('\tStatus code: %s' %req.status_code)
+    print('\tRecords: %s' %(len(df)), flush=True)
+    return df
+
+def get_opts():
+    '''
+    Handle command line arguments and options.
+    '''
+    parser = OptionParser(usage = 'usage: %prog [options] get_camd_cems')
+    parser.add_option('-a', '--apikey', dest='apikey', 
+      help='Your data.gov API key', default='')
+    parser.add_option('-y', '--year', dest='year', help='Year to process', default='2021')
+    parser.add_option('-u', '--campd_url', dest='campd_url', 
+      help='CAMPD Bulk Data Bucket URL', 
+      default='https://api.epa.gov/easey/bulk-files')
+    parser.add_option('-o', '--output_path', dest='output_path', 
+      help='Path to write monthly CEMs path', default='output')
+    parser.add_option('-p', '--prefix', dest='prefix', 
+      help='CAMDP CEMs emissions prefix', default='campd')
+    parser.add_option('-s', '--states', dest='states', 
+      help='Comma delimited list of state abbreviations. Defaults to all.', default='')
+    return parser.parse_args()
+
+def get_states(stlist):
+    '''
+    Return a list of state abbreviations
+    '''
+    if stlist:
+        states = [st.strip() for st in stlist.strip().lower().split(',')]
+    else:
+        states = ['ak','al','ar','az','ca','co','ct','de','fl','ga','hi','ia','id','il','in','ks',
+         'ky','la','ma','md','me','mi','mn','mo','ms','mt','nc','nd','ne','nh','nj','nm','nv','ny',
+         'oh','ok','or','pa','ri','sc','sd','tn','tx','ut','va','vt','wa','wi','wv','wy']
+    return states
+
+class CEMS:
+
+    def __init__(self):
+        # Column maps from the API to CEMs format
+       self. colmap = {'stateCode': 'State', 'facilityName': 'Facility Name', 'facilityId': 'Facility ID',
+         'unitId': 'Unit ID', 'associatedStacks': 'Associated Stacks', 'date': 'Date', 'hour': 'Hour',
+         'opTime': 'Operating Time', 'grossLoad': 'Gross Load (MW)', 
+         'steamLoad': 'Steam Load (1000 lb/hr)', 'heatInput': 'Heat Input (mmBtu)',
+         'so2MassMeasureFlg': 'SO2 Mass Measure Indicator', 'so2Rate': 'SO2 Rate (lbs/mmBtu)',
+         'so2Mass': 'SO2 Mass (lbs)', 'so2RateMeasureFlg': 'SO2 Rate Measure Indicator',
+         'co2MassMeasureFlg': 'CO2 Mass Measure Indicator', 'co2Rate': 'CO2 Rate (short tons/mmBtu)',
+         'co2Mass': 'CO2 Mass (short tons)', 'co2RateMeasureFlg': 'CO2 Rate Measure Indicator',
+         'noxMassMeasureFlg': 'NOx Mass Measure Indicator', 'noxRate': 'NOx Rate (lbs/mmBtu)',
+         'noxMass': 'NOx Mass (lbs)', 'noxRateMeasureFlg': 'NOx Rate Measure Indicator',
+         'primaryFuelInfo': 'Primary Fuel Type', 'secondaryFuelInfo': 'Secondary Fuel Type',
+         'unitType': 'Unit Type', 'so2ControlInfo': 'SO2 Controls', 'noxControlInfo': 'NOx Controls',
+         'pmControlInfo': 'PM Controls', 'hgControlInfo': 'Hg Controls', 'programCodeInfo': 'Program Code',
+          'heatInputMeasureFlg': 'Heat Input Measure Indicator'}
+       self.cols = ['State','Facility Name','Facility ID','Unit ID','Associated Stacks','Date',
+         'Hour','Operating Time','Gross Load (MW)','Steam Load (1000 lb/hr)','SO2 Mass (lbs)',
+         'SO2 Mass Measure Indicator','SO2 Rate (lbs/mmBtu)','SO2 Rate Measure Indicator',
+         'NOx Mass (lbs)','NOx Mass Measure Indicator','NOx Rate (lbs/mmBtu)',
+         'NOx Rate Measure Indicator','CO2 Mass (short tons)','CO2 Mass Measure Indicator',
+         'CO2 Rate (short tons/mmBtu)','CO2 Rate Measure Indicator','Heat Input (mmBtu)',
+         'Heat Input Measure Indicator','Primary Fuel Type','Secondary Fuel Type','Unit Type',
+         'SO2 Controls','PM Controls','NOx Controls','Hg Controls','Program Code']
+       strcols = ['Facility ID','Unit ID','Date','SO2 Mass Measure Indicator',
+         'SO2 Rate Measure Indicator','NOx Mass Measure Indicator','NOx Rate Measure Indicator',
+         'CO2 Mass Measure Indicator','CO2 Rate Measure Indicator','Heat Input Measure Indicator',
+         'Primary Fuel Type','Secondary Fuel Type','Unit Type','SO2 Controls','PM Controls',
+         'NOx Controls','Hg Controls','Program Code','Associated Stacks','Hour']
+       self.dtype = {col: str for col in strcols}
+
+if __name__ == '__main__':
+    main()

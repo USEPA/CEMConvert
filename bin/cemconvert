@@ -1,0 +1,79 @@
+#!/usr/bin/env python3
+
+import os.path
+import pandas as pd
+from cemconvert.proc import *
+from cemconvert.run_parse import RunOpts
+from cemconvert.qa import write_hourly_qa
+from cemconvert.ff10 import FF10
+from cemconvert.temporal import Temporal
+from cemconvert.tz import TZ
+
+def main():
+    opts = RunOpts()
+    eisids = ['facility_id','unit_id','rel_point_id','process_id']
+    orisids = ['oris_facility_code','oris_boiler_id']
+    inv = FF10(opts)
+    # Get full annual FF10 and header
+    inv.read_ann_ff10(opts.ann_ff10)
+    annemis = inv.extract_ann_emis(inv.ann_ff10)
+    tz = TZ()
+    tz.fips_to_unit(inv.oris_fips)
+    hourly = proc_hourly(opts, tz)
+    hourly = gapfill_dates(hourly.copy(), opts.year) 
+    # Calculate the unit-level CEMs temporal factors for annual->hourly
+    temp = Temporal(opts)
+    cem_temporal = temp.calc_cem_temporal(hourly)
+    # Setup an empty dataframe to hold the annual values
+    annual = pd.DataFrame()
+    # Copy over the hourly CEM values and temporalize the annual inventory emissions to hourly
+    hourly = set_key(hourly[hourly['poll'].isin(opts.cempolls)].copy())
+    anndef = set_key(annemis[annemis['poll'].isin(opts.cempolls)].copy())
+    # Merge in and apply the unit to process ID fractions
+    hrcols = list(hourly.columns) + eisids
+    hourly = anndef.join(hourly, lsuffix='_ff10')
+    hourly[inv.hrvals+['daytot',]] = hourly[inv.hrvals+['daytot',]].fillna(0).\
+      multiply(hourly['unit_frac'].fillna(1), axis=0)
+    # Use the emissions values from the annual FF10 rather than the CEMs for pollutants
+    #  Matched to the CEMs 
+    if opts.keepann:
+        monemis = inv.extract_monthly_emis(ann_ff10)
+        hourly = scale_hourly(hourly, monemis)
+    hourly = set_key(hourly[hourly.ann_value.notnull()].copy())
+    # Find the units with 0 annual CEM emissions for replacement with temporalized annual values
+    zunit = hourly[hourly.oris_facility_code != ''].groupby(level=0)['daytot'].sum()
+    zidx = zunit[zunit == 0].index.unique()
+    # Loop over the months in the file. Doing this on the annual seems like a big memory sink 
+    #  this could eventually be parallelized with the right tweeks
+    for month in list(hourly.loc[hourly['month'].notnull(), 'month'].drop_duplicates()):
+        print('Month %s' %int(month), flush=True)
+        hourlymth = hourly.loc[hourly['month'] == month, hrcols].copy()
+        mthtemp = cem_temporal[cem_temporal['month'] == month]
+        # Temporalize non-CEM variables
+        for poll in opts.calcpolls:
+            print(f'\tTemporalizing {poll} from annual using {opts.temporalvar}')
+            hourly_poll = temp.apply_temporal(annemis[annemis['poll'] == poll], mthtemp)
+            hourlymth = hourlymth.append(set_key(hourly_poll))
+        # Find units where the CEMs NOX/SO2/CO2 is 0 annually and replace with temporalized annual
+        if len(zidx) > 0:
+            print(f'\tTemporalizing CEMs from annual using {opts.temporalvar}')
+            unitreplace = hourly.loc[zidx, ['date','daytot']].drop_duplicates()
+            hourlymth.drop(zidx, inplace=True)
+            unitreplace = unitreplace.join(anndef, lsuffix='_old')
+            hourly_replace = temp.apply_temporal(unitreplace, mthtemp)
+            hourlymth = hourlymth.append(set_key(hourly_replace))
+        # Fill in the HOURACT variable for temporalization of other variables
+        mthtemp = mthtemp.merge(annemis[eisids+orisids].drop_duplicates(), on=orisids, how='left') 
+        mthtemp['poll'] = opts.temporalvar 
+        #  and append that to the hourly file
+        hourlymth = hourlymth.append(set_key(mthtemp))
+        hourlymth = proc_hourly_meta(hourlymth, inv.fips, inv.sccs)
+        inv.write_monthly_ff10(hourlymth, opts)
+        # Append the daytot from the hourly to the annual dataframe
+        annual = annual.append(hourlymth[eisids+orisids+['poll','month','daytot']])
+        write_hourly_qa(hourly, hourlymth, opts)
+    inv.write_annual(annual, opts)
+
+if __name__ == '__main__':
+    main()
+
