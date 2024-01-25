@@ -12,7 +12,8 @@ class CEM:
           'Steam Load (1000 lb/hr)','SO2 Mass (lbs)','CO2 Mass (short tons)','Heat Input (mmBtu)',
           'SO2 Mass Measure Indicator','NOx Mass Measure Indicator','CO2 Mass Measure Indicator',
           'Operating Time','NOx Rate (lbs/mmBtu)','NOx Rate Measure Indicator','NOx Mass (lbs)',
-          'Heat Input Measure Indicator']
+          'Heat Input Measure Indicator','State','Facility Name','SO2 Rate (lbs/mmBtu)',
+          'SO2 Rate Measure Indicator','CO2 Rate (short tons/mmBtu)','CO2 Rate Measure Indicator']
         # CEM column to a shortened column name
         self.colmap = {'Facility ID': 'oris_facility_code', 'Unit ID': 'oris_boiler_id',
           'Date': 'date', 'Gross Load (MW)': 'GLOAD', 'Steam Load (1000 lb/hr)': 'SLOAD', 
@@ -61,7 +62,8 @@ class CEM:
         '''
         dtype = {'Facility ID': str, 'Unit ID': str, 'SO2 Mass Measure Indicator': str,
           'NOx Mass Measure Indicator': str, 'CO2 Mass Measure Indicator': str,
-          'NOx Rate Measure Indicator': str, 'Heat Input Measure Indicator': str}
+          'NOx Rate Measure Indicator': str, 'Heat Input Measure Indicator': str,
+          'SO2 Rate Measure Indicator': str, 'CO2 Rate Measure Indicator': str}
         df = pd.read_csv(fn, usecols=self.cemcols, dtype=dtype)
         # Rename columns to shorten names and fit formats
         df.rename(columns=self.colmap, inplace=True)

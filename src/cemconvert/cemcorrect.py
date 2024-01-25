@@ -36,9 +36,10 @@ class CemCorrect:
         df['frac'] = df[f'{col}_cnt'].fillna(0) / df.date.dt.daysinmonth
         # Calculate monthly means for the unit/hour that >= threshold
         idx = (df['frac'] >= self.threshold) & (df[col].notnull())
-        monmeans = df[idx].groupby(self.unitmonth, as_index=False).mean()
+        monmeans = df.loc[idx, self.unitmonth+[col,]].groupby(self.unitmonth, as_index=False).mean()
         # Otherwise use the annual mean
-        annmeans = df[df[col].notnull()].groupby(self.unithour, as_index=False).mean()
+        annmeans = df.loc[df[col].notnull(), self.unithour+[col,]].groupby(self.unithour, 
+          as_index=False).mean()
         df = pd.merge(df.loc[df['frac'] < self.threshold, self.unitmonth].drop_duplicates(),
           annmeans, on=self.unithour, how='left', suffixes=['','_unit'])
         cols = self.unitmonth + [col,]
@@ -71,9 +72,11 @@ class CemCorrect:
         df['frac'] = df[f'{col}_rate_cnt'].fillna(0) / df.date.dt.daysinmonth
         # Calculate monthly means for the unit/hour that >= threshold
         idx = (df['frac'] >= self.threshold) & (df[f'{col}_rate'] > 0)
-        monmeans = df[idx].groupby(self.unitmonth, as_index=False).mean()
+        monmeans = df.loc[idx, self.unitmonth+[f'{col}_rate',]].groupby(self.unitmonth, 
+          as_index=False).mean()
         # Otherwise use the annual mean
-        annmeans = df[df[f'{col}_rate'] > 0].groupby(self.unithour, as_index=False).mean()
+        annmeans = df.loc[df[f'{col}_rate'] > 0, self.unithour+[f'{col}_rate',]].groupby(self.unithour,
+          as_index=False).mean()
         df = pd.merge(df.loc[df['frac'] < self.threshold, self.unitmonth].drop_duplicates(),
           annmeans, on=self.unithour, how='left', suffixes=['','_unit'])
         cols = self.unitmonth + [f'{col}_rate',]
