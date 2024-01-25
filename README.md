@@ -23,6 +23,7 @@ Options:<br>
 &nbsp;&nbsp;-o OUTPUT_PATH, --output_path=OUTPUT_PATH<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FF10 inventory output path<br>
 &nbsp;&nbsp;-c, --write_cems      Write hourly CEM data in old SMOKE format<br>
+&nbsp;&nbsp;-a, --write_ertac     Write hourly CEM data in old ERTAC format<br>
 &nbsp;&nbsp;-g, --gmt             Output hourly FF10 to GMT instead of local time<br>
 &nbsp;&nbsp;-r, --ramp_up         Timeshift hours for the year after the designated year<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;back one year<br>

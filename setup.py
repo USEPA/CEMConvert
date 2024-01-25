@@ -5,7 +5,7 @@ this_directory = Path(__file__).parent
 long_description = (this_directory / "README.md").read_text()
 setup(
     name="cemconvert",
-    version="0.5.7",
+    version="0.5.11",
     packages=find_packages(where='src'),
     package_dir={'': 'src'},
     python_requires='>=3.5',
