@@ -85,6 +85,17 @@ class CEM:
               (self.hourly.date.dt.month.astype(int) == mon)
             self.write_old_cems_month(fn, self.hourly[idx])
 
+    def write_ertac_cems(self, output_path, year, period):
+        '''
+        Write the old format CEMS for the period
+        '''
+        for mon in period:
+            # Write out ERTAC CEM format
+            fn = os.path.join(output_path, 'ertac_cems_%s_%0.2d.csv' %(year, mon))
+            idx = (self.hourly.date.dt.year.astype(int) == int(year)) &\
+              (self.hourly.date.dt.month.astype(int) == mon)
+            self.write_ertac_cems_month(fn, self.hourly[idx].copy())
+
     def format_old_cems(self, df):
         '''
         Format to the old CEMs format by month and export the dataframe
@@ -110,6 +121,21 @@ class CEM:
         cems = self.format_old_cems(monthly.copy())
         cems.to_csv(fn, index=False, header=False)
 
+    def write_ertac_cems_month(self, fn, monthly):
+        '''
+        Format to the Old ERTAC CEM format
+        '''
+        # Invert the column mapping dictionary
+        colmap = {v: k for k, v in self.colmap.items()} 
+        monthly.rename(columns=colmap, inplace=True)
+        cols = ['State','Facility Name','Facility ID','Unit ID','Date','Hour','Operating Time',
+          'Gross Load (MW)','Steam Load (1000 lb/hr)','SO2 Mass (lbs)','SO2 Mass Measure Indicator',
+          'SO2 Rate (lbs/mmBtu)','SO2 Rate Measure Indicator','NOx Rate (lbs/mmBtu)',
+          'NOx Rate Measure Indicator','NOx Mass (lbs)','NOx Mass Measure Indicator',
+          'CO2 Mass (short tons)','CO2 Mass Measure Indicator','CO2 Rate (short tons/mmBtu)',
+          'CO2 Rate Measure Indicator','Heat Input (mmBtu)']
+        monthly.to_csv(fn, index=False, columns=cols)
+    
     def pivot_hourly(self, df):
         '''
         Pivot the hourly data out to columns by hour

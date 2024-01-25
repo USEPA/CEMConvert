@@ -29,6 +29,8 @@ def proc_hourly(opts, tz):
         fn = os.path.join(opts.output_path, 'cemcorrect_qa_%s_%s.csv' %(opts.label, opts.year))
         correct.write_qa(fn)
     cems.write_old_cems(opts.input_path, opts.year, opts.months)
+    if opts.ertac:
+        cems.write_ertac_cems(opts.input_path, opts.year, opts.months)
     # Timeshift hourly FF10 to GMT
     if opts.gmt_output:
         cems.hourly = tz.timeshift_to_gmt(cems.hourly)

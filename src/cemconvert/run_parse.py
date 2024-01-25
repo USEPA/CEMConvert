@@ -29,6 +29,8 @@ class RunOpts(object):
           help='FF10 inventory output path', default='output')
         self.parser.add_option('-c', '--write_cems', action='store_true', dest='write_cems', 
           help='Write hourly CEM data in old SMOKE format', default=False)
+        self.parser.add_option('-a', '--write_ertac', action='store_true', dest='ertac', 
+          help='Write hourly CEM data in old ERTAC format', default=False)
         self.parser.add_option('-g', '--gmt', action='store_true', dest='gmt_output', 
           help='Output hourly FF10 to GMT instead of local time', default=False)
         self.parser.add_option('-r', '--ramp_up', action='store_true', dest='ramp_up', 
