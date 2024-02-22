@@ -75,7 +75,7 @@ def get_opts():
     parser.add_option('-y', '--year', dest='year', help='Year to process', default='2021')
     parser.add_option('-u', '--campd_url', dest='campd_url', 
       help='CAMPD Bulk Data Bucket URL', 
-      default='https://api.epa.gov/easey/bulk-files')
+      default='https://api.epa.gov/easey/camd-services/bulk-files')
     parser.add_option('-o', '--output_path', dest='output_path', 
       help='Path to write monthly CEMs path', default='output')
     parser.add_option('-p', '--prefix', dest='prefix', 

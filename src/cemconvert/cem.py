@@ -130,6 +130,7 @@ class CEM:
         # Invert the column mapping dictionary
         colmap = {v: k for k, v in self.colmap.items()} 
         monthly.rename(columns=colmap, inplace=True)
+        monthly.Date = monthly.Date.dt.strftime('%m-%d-%Y')
         cols = ['State','Facility Name','Facility ID','Unit ID','Date','Hour','Operating Time',
           'Gross Load (MW)','Steam Load (1000 lb/hr)','SO2 Mass (lbs)','SO2 Mass Measure Indicator',
           'SO2 Rate (lbs/mmBtu)','SO2 Rate Measure Indicator','NOx Rate (lbs/mmBtu)',
